@@ -89,7 +89,7 @@ library("ggplot2")
 - W: Number of Wins a team recorded in a season
 - L: Number of Loses a team recorded in a season
 - R: Number of Runs scored FOR a team recorded in a season
-- RA: Numger of Runs scored AGAINST a team in a season
+- RA: Number of Runs scored AGAINST a team in a season
 - EWP: Expected Win Percentage
 - EWins: Expected WINS (Forecast)
 
@@ -151,6 +151,8 @@ df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,wOBA,FIP)
 Data <- df2 %>% 
   mutate(EWP=round(R/(R+RA), 4), EWins=EWP*(W+L), WinDiff=round(EWins-W)) 
 
+Summary <- summary(Data)
+
 ```
 
 <h3 style="text-align: left;">2013 MLB Salaries Table</h3>
@@ -167,15 +169,29 @@ Table highlights and summarizes the the team Pitching Statistics of each team in
 
 <h3 style="text-align: left;">2013 MLB Season Table</h3>
 ```{r, echo = FALSE, results = 'asis'}
-library("knitr")
-kable(summarize(Data, type = "numeric"))
+library(knitr)
+kable(Summary, caption = 'Summary Statisitics')
 ```
 Table is a merging of both the Salaries and Teams Table to include the total payroll spend by each team in 2013 and coupled with wins, losses, runs scored, and runs allowed by a given team. For further information on the other variables, please refer to the variables table located in the appendix.
 
 <h1 style="text-align: left;">Modeling</h1>
+Now that we have gathered all of our data, made the proper modifications needed to analysis our data, lets dig into some modeling. First, I was interesting in seeing if there was any kind of relationship with FIP and wOBA on a team or even league level. In the graph below, we see that teh American League appears to have a grouping of teams that are high when it comes to wOBA compared to their National League counterparts. However, I dont believe this graph really tells us much, since all of the points are scattered across with no particular order. So lets progress to the next exploratory model. 
+
+<h3 style="text-align: left;">2013 MLB Season Team FIP vs. Team wOBA</h3>
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="60%"}
+g <- ggplot(df2, aes(x=FIP, y=wOBA, size=Payroll, color=lgID)) + geom_point() 
+g + 
+  labs(
+  title = "2013 MLB Team Average wBOA vs. FIP",
+  x = "Team: Fielding Independent Pitching",
+  y = "Team: Weighted On-Base Average"
+) + facet_grid() + theme_gray() #+ xlim(3.45, 4.75) + ylim(0.275, 0.400)
+```
+
+The second thing I wanted to observe is if there is a visual relationship between wins and payroll. For a long-time Major League Baseball has not had an established salary cap. Meaning, teams can spend as much or as little as they would like on their team's payroll for a given season. This has the perception by many fans to be an 'unfair advantage' by the wealthy owners and their teams. However, as we can observe below, at least within the 2013 season, the disparity between the teams who spent a large amount (over 150MM) and those who did not is rather significant. We do not see a large numbers of the teams who spent a significant amount of money in 2013 making it into the playoffs as opposed to teams who spent below that threshold. Therefore, I would say payroll would not have a significant effect on wins, from a visual sense, but we will confirm that with our model later on. 
 
 <h3 style="text-align: left;">2013 MLB Season Team Wins vs. Total Payroll</h3>
-```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="100%"}
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="60%"}
 g <- ggplot(Data, aes(x=W, y=Payroll, color = factor(lgID))) + geom_point() + stat_smooth(method = 'lm')
 g + labs(x = "Actual Wins by Team",
        y = "Total Payroll by Team", 
@@ -183,9 +199,10 @@ g + labs(x = "Actual Wins by Team",
   theme(plot.title = element_text(hjust = 0.5))
 ```
 
+Lastly, I wanted to observe if we predicted a means expected win percentage versus their actual wins earned, would we see a highly positive relationship. We can only assume that a team with a lot of wins scored significantly more runs than they gave up, but just to make sure we are correct in this assumption, lets test it. Within our model, we can see that a expected wins by team and actual wins have a highly positive relationship and that the majority of teams that scored more runs than surrendered to the other team, did in fact win games at a higher rate. Now that we understand what kind of varialbles we believe who have some relationship to wins, lets do some regression testing.
 
 <h3 style="text-align: left;">2013 MLB Season Team Wins vs. Expected Wins</h3>
-```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="100%"}
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="60%"}
 g <- ggplot(Data, aes(x=W, y=EWins, color=Payroll)) + geom_point() + stat_smooth(method = 'lm')
 g + scale_color_gradient(low="red", high="green") + 
   labs(x = "Actual Wins by Team",

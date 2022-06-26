@@ -4,6 +4,7 @@ library(Lahman)
 library(ggplot2)
 library(dplyr)
 library(knitr)
+library(Hmisc)
 
 #Loading in the salaries of each team for the 2013 Season
 S <- Salaries %>% select(yearID,teamID,lgID,playerID,salary) %>%
@@ -57,6 +58,8 @@ df2 <- subset(df, !duplicated(df$teamID))
 df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,wOBA,FIP)
 head(df2, n=30)
 
+describe(df2)
+
 g <- ggplot(df2, aes(x=FIP, y=wOBA, size=Payroll, color=lgID)) + geom_point() 
 g + 
   labs(
@@ -83,4 +86,4 @@ g + scale_color_gradient(low="red", high="green") +
 
 Wins <- lm(W~EWins+wOBA+FIP+Payroll, data=Data)  
 Wins
-
+summary(Wins)
