@@ -1,0 +1,199 @@
+---
+title: "MLB Win Percentage Predictor for 2013 Season"
+author: "Jesse Hendren-Mills"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    number_sections: no
+  word_document:
+    toc: yes
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, out.width="75%", fig.align='left'}
+knitr::include_graphics("2013_World_Series_logo.png")
+```
+
+<h1 style="text-align: left;">Introduction</h1>
+
+
+In 2013, MLB baseball saw the Boston Red Sox win their third World Series in 10 seasons over the St. Louis Cardinals with David Ortiz taking home World Series MVP honors. No one, was really shocked by these two teams making it to the World Series. They were head and shoulders better than the majority of their respective leagues truly dominated all the way to the World Series. These two teams we great on the field and but with seemingly large gap in funding, Boston at 150+ Million and St.Louis at 92 Million. 
+
+The premise of this analysis is to understand if we can predict wins and losses based on a teams runs scored, runs allowed, and payroll. In theory, payroll enables teams to purchase the best players and the best players should be able to score the most runs while giving up the fewest. Those expected win totals will give us an understanding of the teams that should have made the playoffs in 2013 based on the number of runs they scored versus the number of runs given up. We will then see if our model is accurate by evaluating those number of correct observations vs total observations. 
+
+```{r, echo=FALSE, out.width="75%", fig.align='left'}
+knitr::include_graphics("Playoffs.png")
+```
+For everyone's knowledge, in 2013, 10 teams made it to the Major League Postseason. The Boston Red Sox, Oakland Atheletics, Detroit Tigers, Cleveland Indian, and Tampa Bay Rays represented the American League. In the National League the St. Louis Cardinals, Atlanta Braves, Los Angeles Dodgers, Pittsburgh Pirates, and Cincinnati Reds made the playoffs. In Major League Baseball, three teams in each league gain a playoff spot by winning their division, the other two spots are filled with the next highest records of a given team. So, if a team had 82 wins and led their division they would be in the playoffs over a team that may have won 89 games and finished 4th in another division
+
+```{r,echo=FALSE, collapse=TRUE, message=FALSE}
+library("rmarkdown")
+library("dplyr")
+library("stargazer")
+library("Lahman")
+library("ggplot2")
+```
+
+<h1 style="text-align: left;">Data Preparation</h1>
+## Reading & Loading Packages
+- ggplot2
+- dplyr
+- Lahman
+- Stargazer
+
+## Data Table Variable Definitions
+### Batting
+- playerID: A players unique I.D.
+- yearID: Year of Record
+- teamID: Team of Record
+- AB: Plate appearances by a batter (minus walks or HBP)
+- R: Total number of Runs recorded by a batter
+- H: Total number of singles recorded by a batter
+- X2B: Total number of doubles recorded by a batter
+- X3B: Total number of triple recorded by a batter
+- HR: Total number of Home Runs recorded by a batter
+- BB: Total number of UNINTENTIONAL Walks recorded by a batter
+- IBB: Total number of INTENTIONAL Walks recorded by a batter
+- HBP: Total number of occurances a batter was HIT BY A PITCH
+- SF: Total number of Sacrifice Flies by a batter
+-wOBA: A batter's Weighted On-Base-Average
+
+### Pitching
+- playerID: A players unique I.D.
+- yearID: Year of Record
+- teamID: Team of Record
+- HR: Home Runs allowed by a pitcher in a given year
+- BB: Number of walks a pitcer gave up in a given year
+- HBP: Number of hitters a pitcher hit with a pitch in a given year
+- SO: Number of strikeouts a pitcher recorded in a given years
+- IPouts: Number of outs a pithcer recorded in a given year
+- FIP: Fielding Independent Pitching Metric
+
+### Salaries
+- yearID: Year of Record
+- teamID: Team of Record
+- lgID: League Identifier
+- playerID: A players unique I.D.
+- salary: Salary compensation of an individual player on a roster
+- Payroll: Total amount of money paid to field a team for a given season
+
+### Teams
+- yearID: Year of Record
+- teamID: Team of Record
+- lgID: League Identifier
+- W: Number of Wins a team recorded in a season
+- L: Number of Loses a team recorded in a season
+- R: Number of Runs scored FOR a team recorded in a season
+- RA: Numger of Runs scored AGAINST a team in a season
+- EWP: Expected Win Percentage
+- EWins: Expected WINS (Forecast)
+
+## Creating Dataframes
+```{r,echo=FALSE, collapse=TRUE, message=FALSE}
+#Loading in the salaries of each team for the 2013 Season
+S <- Salaries %>% 
+  select(yearID,teamID,lgID,playerID,salary) %>%
+  filter(yearID==2013) %>%
+  group_by(teamID) %>%
+  mutate(Payroll = sum(salary))
+  
+#Loading in the general statistics of each team for the 2013 Season
+T <- Teams %>% 
+  select(yearID,lgID,teamID,W,L,R,RA) %>%
+  filter(yearID==2013) %>%
+  group_by(teamID)
+
+#Loading in individual batting statistics for the 2013 Season
+B <- Batting %>% 
+  select(playerID,yearID,teamID,AB,R,H,X2B,X3B,HR,BB,IBB,HBP,SF)%>%
+  filter(yearID==2013) %>%
+  filter(AB >= 35) %>%
+  mutate(
+    wOBA = (((0.69*BB) + (0.719*HBP) + (0.87*H) + (1.217*X2B) + (1.529*X3B) + (1.94*HR)) 
+            /  (AB+BB+IBB+SF+HBP))) %>%
+  select(playerID,yearID,teamID,wOBA)
+
+B <- B %>%
+  group_by(teamID)%>%
+  summarize(wOBA = mean(wOBA, na.rm=TRUE))
+
+#Loading in individual pitching statistics for the 2013 Season
+P <- Pitching %>% 
+  select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
+  filter(yearID==2013)%>%
+  filter(IPouts >= 60) %>%
+  mutate(IP = IPouts/3) %>%
+  mutate(FIP = ((HR*13 + 3*(BB+HBP) - 2*SO) / 
+                  IP + 3.2)) %>%
+  select(playerID,yearID,teamID,FIP,IP)
+
+P <- P %>%
+  group_by(teamID)%>%
+  summarize(FIP=mean(FIP, na.rm=TRUE))
+
+#Merge Salaries and Teams Dataframes by Teamid, Yearid, and Leagueid to create 
+#One Dataframe for analysis
+df <- merge(S, T, by = c("teamID", "yearID", "lgID"))
+df <- left_join(df,B, by = c("teamID"), na_matches="never")
+df <- left_join(df,P,by = c("teamID"), na_matches="never")
+
+#Removing duplicate observations for one observation per team
+df2 <- subset(df, !duplicated(df$teamID))
+
+#Selecting need columns for analysis
+df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,wOBA,FIP)
+
+Data <- df2 %>% 
+  mutate(EWP=round(R/(R+RA), 4), EWins=EWP*(W+L), WinDiff=round(EWins-W)) 
+
+```
+
+<h3 style="text-align: left;">2013 MLB Salaries Table</h3>
+Table highlights and summarizes the the payroll of each team in 2013 and the players which team paid and how much they were paid for that season. For this analysis, we were not interested in individual pay, only the sum of what each team spent in 2013. Therefore, we will remove players names, IDs, and individual salaries from the table. 
+
+<h3 style="text-align: left;">2013 MLB Team Statistics Table</h3>
+Table highlights and summaries each team's wins, losses, runs scored, runs allowed, and playoff win statistics. These columns will be used to help us predict future win totals and see if our model is statistically significant and accurate at predicting playoff teams. 
+
+<h3 style="text-align: left;">2013 MLB Team Batting Table</h3>
+Table highlights and summarizes the the team Batting Statistics of each team in 2013 and the players which team paid and how much they were paid for that season. For this analysis, we were not interested in individual pitching performance, only the sum of how each team performed in 2013. 
+
+<h3 style="text-align: left;">2013 MLB Team Pitching Table</h3>
+Table highlights and summarizes the the team Pitching Statistics of each team in 2013. For this analysis, we were not interested in individual pitching performance, only the sum of how each team performed in 2013.
+
+<h3 style="text-align: left;">2013 MLB Season Table</h3>
+```{r, echo = FALSE, results = 'asis'}
+library("knitr")
+kable(summarize(Data, type = "numeric"))
+```
+Table is a merging of both the Salaries and Teams Table to include the total payroll spend by each team in 2013 and coupled with wins, losses, runs scored, and runs allowed by a given team. For further information on the other variables, please refer to the variables table located in the appendix.
+
+<h1 style="text-align: left;">Modeling</h1>
+
+<h3 style="text-align: left;">2013 MLB Season Team Wins vs. Total Payroll</h3>
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="100%"}
+g <- ggplot(Data, aes(x=W, y=Payroll, color = factor(lgID))) + geom_point() + stat_smooth(method = 'lm')
+g + labs(x = "Actual Wins by Team",
+       y = "Total Payroll by Team", 
+       color = "League") +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+<h3 style="text-align: left;">2013 MLB Season Team Wins vs. Expected Wins</h3>
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="100%"}
+g <- ggplot(Data, aes(x=W, y=EWins, color=Payroll)) + geom_point() + stat_smooth(method = 'lm')
+g + scale_color_gradient(low="red", high="green") + 
+  labs(x = "Actual Wins by Team",
+       y = "Expected Wins by Team") +
+  guides(fill = guide_legend(title = "Team Payroll")) +
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+<h1 style="text-align: left;">Conclusion</h1>
+
+<h1 style="text-align: left;">Reference</h1>
