@@ -1,4 +1,4 @@
-# Section 1 ------------
+# Section 1 ------------ Loading Packages and Dataframe building
 #Loading in R Packages for Baseball Analysis
 library(Lahman)
 library(ggplot2)
@@ -20,14 +20,10 @@ T <- Teams %>% select(yearID,lgID,teamID,W,L,R,RA) %>%
 #Loading in individual batting statistics for the 2013 Season
 B <- Batting %>% select(playerID,yearID,teamID,AB,R,H,X2B,X3B,HR,BB,IBB,HBP,SF)%>%
   filter(yearID==2013) %>%
-  filter(AB >= 35) %>%
+  filter(AB >= 120) %>%
   mutate(wOBA = (((0.69*BB) + (0.719*HBP) + (0.87*H) + (1.217*X2B) + (1.529*X3B) + (1.94*HR)) / 
                 (AB+BB+IBB+SF+HBP)))%>%
   select(playerID,yearID,teamID,wOBA)
-
-B <- B %>%
-  group_by(teamID)%>%
-  summarize(wOBA = mean(wOBA, na.rm=TRUE))
 
 #Loading in individual pitching statistics for the 2013 Season
 P <- Pitching %>% select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
@@ -38,37 +34,56 @@ P <- Pitching %>% select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
                   IP + 3.2)) %>%
   select(playerID,yearID,teamID,FIP,IP)
 
-P <- P %>%
-  group_by(teamID)%>%
-  summarize(FIP=mean(FIP, na.rm=TRUE))
-
-
-#Merge Salaries and Teams Dataframes by Teamid, Yearid, and Leagueid to create 
+#Merge Salaries, Teams, Batting, and Pitching, Dataframes by Teamid, Yearid, and Leagueid to create 
 #One Dataframe for analysis
-df <- merge(S, T, by = c("teamID", "yearID", "lgID"))
-df <- left_join(df,B, by = c("teamID"), na_matches="never")
-df <- left_join(df,P,by = c("teamID"), na_matches="never")
+df <- left_join(S, T, by = c("teamID", "yearID", "lgID"))
+df <- left_join(df,B, by = c("playerID", "teamID", "yearID"), na_matches="never")
+df <- left_join(df,P,by = c("playerID", "teamID", "yearID"), na_matches="never")
 
-head(df, n=400)
+df <- df %>%
+  group_by(teamID) %>%
+  mutate(TEAMFIP =mean(FIP, na.rm=TRUE))
+
+df <- df %>%
+  group_by(teamID) %>%
+  mutate(TEAMwOBA =mean(wOBA, na.rm=TRUE))
 
 #Removing duplicate observations for one observation per team
 df2 <- subset(df, !duplicated(df$teamID))
 
 #Selecting need columns for analysis
-df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,wOBA,FIP)
+df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,TEAMwOBA,TEAMFIP)
 head(df2, n=30)
 
-describe(df2)
-
-g <- ggplot(df2, aes(x=FIP, y=wOBA, size=Payroll, color=lgID)) + geom_point() 
-g + 
+#Section 2--------- Building Graphs
+# Creating graph to explore possible relationship of FIP and wOBA
+phi <- ggplot(df2, aes(x=TEAMFIP, y=TEAMwOBA, size=Payroll, color=lgID)) + geom_point() 
+phi + 
   labs(
   title = "2013 MLB Team Average wBOA vs. FIP",
   x = "Team: Fielding Independent Pitching",
   y = "Team: Weighted On-Base Average"
-) + facet_grid() + theme_gray() #+ xlim(3.45, 4.75) + ylim(0.275, 0.400)
+) + facet_grid() + theme_gray()
 
-#Section 2 ------------
+# Creating graph to explore possible relationship of Wins and FIP
+tau <- ggplot(df2, aes(x=W, y=TEAMFIP, size=Payroll, color=lgID)) + geom_point() 
+tau + 
+  labs(
+    title = "2013 MLB Team Wins vs. FIP",
+    x = "Team Wins",
+    y = "Team: Fielding Independent Pitching"
+  ) + facet_grid() + theme_gray()
+
+# Creating graph to explore possible relationship of Wins and FIP
+nu <- ggplot(df2, aes(x=W, y=TEAMwOBA, size=Payroll, color=lgID)) + geom_point() 
+nu + 
+  labs(
+    title = "2013 MLB Team Wins vs. wOBA",
+    x = "Team Wins",
+    y = "Team: Weighted On-Base Average"
+  ) + facet_grid() + theme_gray()
+
+#Section 3 ------------
 
 # Creating Predictive Model of teams that did make the playoffs verses those who are
 #predicted to make the playoffs
@@ -77,13 +92,13 @@ Data <- df2 %>%
 
 
 #Now we can Create a plot to show Wins vs. Expected Wins
-g <- ggplot(Data, aes(x=W, y=EWins, color=Payroll)) + geom_point() + stat_smooth(method = 'lm')
-g + scale_color_gradient(low="red", high="green") + 
+theta <- ggplot(Data, aes(x=W, y=EWins, color=Payroll)) + geom_point() + stat_smooth(method = 'lm')
+theta + scale_color_gradient(low="red", high="green") + 
   labs(title = "2013 MLB Season Team Wins vs. Expected Wins",
        x = "Actual Wins by Team",
        y = "Expected Wins by Team") +
   guides(fill = guide_legend(title = "Team Payroll"))
 
-Wins <- lm(W~EWins+wOBA+FIP+Payroll, data=Data)  
+Wins <- lm(W~EWins+TEAMwOBA+TEAMFIP+Payroll, data=Data)  
 Wins
 summary(Wins)
