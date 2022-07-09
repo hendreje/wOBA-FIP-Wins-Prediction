@@ -5,13 +5,27 @@ date: "`r Sys.Date()`"
 output:
   html_document:
     toc: yes
-    toc_float: yes
     number_sections: no
   word_document:
     toc: yes
   pdf_document:
     toc: yes
 ---
+```{r,echo=FALSE, collapse=TRUE, message=FALSE}
+library("rmarkdown")
+library("dplyr")
+library("Lahman")
+library("ggplot2")
+library("formattable")
+library("knitr")
+library("car")
+library("stargazer")
+library("MVN")
+library("broom")
+library("Hmisc")
+library("lmtest")
+library("stargazer")
+```
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -23,34 +37,33 @@ knitr::include_graphics("2013_World_Series_logo.png")
 
 <h1 style="text-align: left;">Introduction</h1>
 
+In 2013, MLB baseball saw the Boston Red Sox win their third World Series in 10 seasons over the St. Louis Cardinals with David Ortiz taking home World Series MVP honors. No one was really shocked by these two teams making it to the World Series. They were head and shoulders better than the majority of their respective leagues and truly dominated their way to the World Series. These two teams we great on the field and but had a seemingly significant difference in funding, Boston at 150+ Million and St.Louis at 92 Million. Additionally, they were poth considered to be two of the better teams when it came to pitching and hitting. With future Hall of Fames such as Manny Rameriez, David Ortiz, and Pedro Martinez for Boston to name a few. However, St. Louis had a few names of their own to include Albert Pujlos, Jim Edmonds, and Mark Mulder. It really was no surprise these two made it to the final game of the year. But we are not here to discuss who made it to the World Series, but to discover what 'ingredients' it takes to "March into October". 
 
-In 2013, MLB baseball saw the Boston Red Sox win their third World Series in 10 seasons over the St. Louis Cardinals with David Ortiz taking home World Series MVP honors. No one, was really shocked by these two teams making it to the World Series. They were head and shoulders better than the majority of their respective leagues truly dominated all the way to the World Series. These two teams we great on the field and but with seemingly large gap in funding, Boston at 150+ Million and St.Louis at 92 Million. 
+The premise of this analysis is to understand if we can predict the number of wins a team recorded based on a teams runs scored, runs allowed, payroll, weighted on-base-average (wOBA), and fielding independent pitching (FIP). In theory, payroll enables teams to purchase the best players and the best players should be able to score the most runs while giving up the fewest. Those expected win totals will give us an understanding of the teams that should have made the playoffs in 2013. This would be based on the number of runs they scored versus the number of runs given up. Additionally, we look to observe if advanced metrics such as wOBA and FIP can explain any of the variation we observe with a team's win total in 2013. 
 
-The premise of this analysis is to understand if we can predict the number of wins a team recorded based on a teams runs scored, runs allowed, payroll, weighted on-base-average (wOBA), and fielding independent pitching (FIP). In theory, payroll enables teams to purchase the best players and the best players should be able to score the most runs while giving up the fewest. Those expected win totals will give us an understanding of the teams that should have made the playoffs in 2013 based on the number of runs they scored versus the number of runs given up. Additionally, we will look to see if advanced metrics such as wOBA and FIP can explain an of the variation we observe with a teams win total. 
-
-```{r, echo=FALSE, out.width="75%", fig.align='left'}
+```{r, echo=FALSE, out.width="75%", fig.align='center'}
 knitr::include_graphics("Playoffs.png")
 ```
-For everyone's knowledge, in 2013, 10 teams made it to the Major League Postseason. The Boston Red Sox, Oakland Atheletics, Detroit Tigers, Cleveland Indian, and Tampa Bay Rays represented the American League. In the National League the St. Louis Cardinals, Atlanta Braves, Los Angeles Dodgers, Pittsburgh Pirates, and Cincinnati Reds made the playoffs. In Major League Baseball, three teams in each league gain a playoff spot by winning their division, the other two spots are filled with the next highest records of a given team. So, if a team had 82 wins and led their division they would be in the playoffs over a team that may have won 89 games and finished 4th in another division
 
-```{r,echo=FALSE, collapse=TRUE, message=FALSE}
-library("rmarkdown")
-library("dplyr")
-library("Lahman")
-library("ggplot2")
-library("formattable")
-```
+###### Note: For everyone's knowledge, in 2013, 10 teams made it to the Major League Postseason. The Boston Red Sox, Oakland Atheletics, Detroit Tigers, Cleveland Indian, and Tampa Bay Rays represented the American League. In the National League the St. Louis Cardinals, Atlanta Braves, Los Angeles Dodgers, Pittsburgh Pirates, and Cincinnati Reds made the playoffs. In Major League Baseball, three teams in each league gain a playoff spot by winning their division, the other two spots are filled with the next highest records of a given team. So, if a team had 82 wins and led their division they would be in the playoffs over a team that may have won 89 games and finished 4th in another division.
 
 <h1 style="text-align: left;">Data Preparation</h1>
-## Reading & Loading Packages
+
+#### Reading & Loading Packages
 - rmarkdown
 - ggplot2
 - dplyr
 - Lahman
 - formattable
+- knitr
+- car
+- MVN
+- broom
+- lmtest
+- stargazer
 
-## Data Table Variable Definitions
-#### Batting
+#### Data Table Variable Definitions
+##### Batting
 - playerID: A players unique I.D.
 - yearID: Year of Record
 - teamID: Team of Record
@@ -67,7 +80,7 @@ library("formattable")
 - wOBA: A batter's Weighted On-Base-Average
 - TEAMwOBA: A given team's average Weighted On-Base-Average in 2013
 
-#### Pitching
+##### Pitching
 - playerID: A players unique I.D.
 - yearID: Year of Record
 - teamID: Team of Record
@@ -79,15 +92,15 @@ library("formattable")
 - FIP: Fielding Independent Pitching Metric
 - TEAMFIP: A given team's average Fielding Independent Pitching in 2013
 
-#### Salaries
+##### Salaries
 - yearID: Year of Record
 - teamID: Team of Record
 - lgID: League Identifier
 - playerID: A players unique I.D.
 - salary: Salary compensation of an individual player on a roster
-- Payroll: Total amount of money paid to field a team for a given season
+- Payroll: Total amount of money paid to field a team for a given season in Millions $
 
-#### Teams
+##### Teams
 - yearID: Year of Record
 - teamID: Team of Record
 - lgID: League Identifier
@@ -100,27 +113,28 @@ library("formattable")
 
 ## Creating Dataframes
 ```{r echo = FALSE, message=FALSE, collapse=TRUE}
-library(formattable)
 #Loading in the salaries of each team for the 2013 Season
-S <- Salaries %>% select(yearID,teamID,lgID,playerID,salary) %>%
+S <- Lahman::Salaries %>% select(yearID,teamID,lgID,playerID,salary) %>%
   filter(yearID==2013) %>%
   group_by(teamID) %>%
-  mutate(Payroll = sum(salary))
+  mutate(Payroll = sum(salary)) %>%
+  mutate(Payroll = Payroll/1000000)
 
 #Loading in the general statistics of each team for the 2013 Season
-T <- Teams %>% select(yearID,lgID,teamID,W,L,R,RA) %>%
+T <- Lahman::Teams %>% select(yearID,lgID,teamID,W,L,R,RA) %>%
   filter(yearID==2013) %>%
   group_by(teamID)
 
 #Loading in individual batting statistics for the 2013 Season
-B <- Batting %>% select(playerID,yearID,teamID,AB,R,H,X2B,X3B,HR,BB,IBB,HBP,SF) %>%
+B <- Lahman::Batting %>% select(playerID,yearID,teamID,AB,R,H,X2B,X3B,HR,BB,IBB,HBP,SF)%>%
   filter(yearID==2013) %>%
   filter(AB >= 120) %>%
-  mutate(wOBA = (((0.69*BB) + (0.719*HBP) + (0.87*H) + (1.217*X2B) + (1.529*X3B) + (1.94*HR)) / (AB+BB+IBB+SF+HBP))) %>%
+  mutate(wOBA = (((0.69*BB) + (0.719*HBP) + (0.87*H) + (1.217*X2B) + (1.529*X3B) + (1.94*HR)) / 
+                (AB+BB+IBB+SF+HBP)))%>%
   select(playerID,yearID,teamID,wOBA)
 
 #Loading in individual pitching statistics for the 2013 Season
-P <- Pitching %>% select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
+P <- Lahman::Pitching %>% select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
   filter(yearID==2013)%>%
   filter(IPouts >= 60) %>%
   mutate(IP = IPouts/3) %>%
@@ -128,10 +142,11 @@ P <- Pitching %>% select(playerID,yearID,teamID,HR,BB,HBP,SO,IPouts) %>%
                   IP + 3.2)) %>%
   select(playerID,yearID,teamID,FIP,IP)
 
-#Merge Salaries, Teams, Batting, and Pitching, Dataframes by Teamid, Yearid, and Leagueid to create one Dataframe for analysis
+#Merge Salaries, Teams, Batting, and Pitching, Dataframes by Teamid, Yearid, and Leagueid to create 
+#One Dataframe for analysis
 df <- left_join(S, T, by = c("teamID", "yearID", "lgID"))
-df <- left_join(df, B, by = c("playerID", "teamID", "yearID"), na_matches="never")
-df <- left_join(df, P, by = c("playerID", "teamID", "yearID"), na_matches="never")
+df <- left_join(df,B, by = c("playerID", "teamID", "yearID"), na_matches="never")
+df <- left_join(df,P,by = c("playerID", "teamID", "yearID"), na_matches="never")
 
 df <- df %>%
   group_by(teamID) %>%
@@ -147,14 +162,18 @@ df2 <- subset(df, !duplicated(df$teamID))
 #Selecting need columns for analysis
 df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,TEAMwOBA,TEAMFIP)
 
-Data <- df2 %>% 
-  mutate(EWP=round(R/(R+RA), 4), EWins=EWP*(W+L), WinDiff=round(EWins-W))
+# Creating Predictive Model of teams that did make the playoffs verses those who are
+#predicted to make the playoffs
+Data <- df2%>%
+  mutate(EWP = ((R/RA)^1.6)/((R/RA)^1.6+1), EWins = EWP*162, AWP = W/162, WinPctDiff = AWP-EWP)
 
-Data$Payroll <- currency(Data$Payroll, digits = 0L)
+DataNeat <- Data
 
-Data$TEAMwOBA <- percent(Data$TEAMwOBA, digits = 2L)
+DataNeat$Payroll <- currency(DataNeat$Payroll, digits = 0L)
 
-Data$EWP <- percent(Data$EWP, digits = 2L)
+DataNeat$TEAMwOBA <- percent(DataNeat$TEAMwOBA, digits = 2L)
+
+DataNeat$EWP <- percent(DataNeat$EWP, digits = 2L)
 ```
 
 <h4 style="text-align: left;">Sean Lahman's Major League Baseball Statistic Descriptions</h4>
@@ -168,64 +187,137 @@ Lahman's "Pitching" data frame highlights and summarizes the the team pitching s
 
 ```{r echo = FALSE, results = 'asis'}
 library(knitr)
-kable(Data, caption = 'Summary Statisitics')
+kable(DataNeat, caption = 'Summary Statisitics')
 ```
 
-<h1 style="text-align: left;">Modeling</h1>
-Now that we have gathered all of our data, made the proper modifications needed to analysis our data, lets dig into some modeling. First, I was interesting in seeing if there was any kind of relationship with FIP and wOBA on a team or even league level. In the graph below, we see that teh American League appears to have a grouping of teams that are high when it comes to wOBA compared to their National League counterparts. However, I dont believe this graph really tells us much, since all of the points are scattered across with no particular order. So lets progress to the next exploratory model. 
+<h1 style="text-align: center;">Testing Assumptions</h1>
+                                            Original Proposed Model
+                             Expected Wins ~ Team WOBA + Team FIP + Payroll + error
 
-```{r, echo=FALSE, message=FALSE, out.width="50%", fig.show='hold'}
-phi <- ggplot(Data, aes(x=TEAMFIP, y=TEAMwOBA, size=Payroll, color=lgID)) + geom_point() 
-phi + 
+
+* Assumption 1: There is a linear relationship between the predictors (x) and the outcome (y)
+* Assumption 2: Residual Errors are independent from each other and predictors (x)
+* Assumption 3: Predictors (x) are independent and observed with negligible error
+* Assumption 4: Residual Errors have constant variance
+* Assumption 5: The observations are independent
+                        
+<h4 style="text-align: left;">Assumption #1: Liner Relationship</h4>
+
+Now that we have gathered all of our data and made the proper modifications, lets dive into some analysis and confirm the five assumptions of multivariate regression. First, we will start with confirming that there exists a linear relationship between each of the independent variables and the dependent variable. We can confirm this by plotting each of three scenarios. From the graphs below, it appears that there is a some what linear relationship between each of the exploratory variables and Wins. We can move onto the next assumption.  
+
+```{r, echo=FALSE, message=FALSE, out.width="60%", fig.show='hold', fig.align='center'}
+alpha <- ggplot(Data, aes(x=EWins, y=Payroll, color=lgID)) + geom_point() + stat_smooth(method = 'lm')
+alpha + 
   labs(
-  title = "2013 MLB Team Average wBOA vs. FIP",
-  x = "Team: Fielding Independent Pitching",
-  y = "Team: Weighted On-Base Average"
-) + facet_grid() + theme_gray()
-
-omega <- ggplot(Data, aes(x=W, y=Payroll, color = factor(lgID))) + geom_point() + stat_smooth(method = 'lm')
-omega + labs(
-       title = "2013 MLB Teams vs Total Payroll", 
-       x = "Actual Wins by Team",
-       y = "Total Payroll by Team", 
-       color = "League") + 
-  facet_grid() + theme_gray()
+    title = "2013 MLB Team Expected Wins vs. Payroll",
+    x = "Team Expected Wins",
+    y = "Team Payroll"
+  ) + facet_grid() + theme_gray()
 ```
-The second thing I wanted to observe is if there is a visual relationship between wins and payroll. For a long-time Major League Baseball has not had an established salary cap. Meaning, teams can spend as much or as little as they would like on their team's payroll for a given season. This has the perception by many fans to be an 'unfair advantage' by the wealthy owners and their teams. However, as we can observe below, at least within the 2013 season, the disparity between the teams who spent a large amount (over 120MM) and those who did not is rather significant. We do not see a large numbers of the teams who spent a significant amount of money in 2013 making it into the playoffs as opposed to teams who spent below that threshold. Therefore, I would say payroll would not have a significant effect on wins, from a visual sense, but we will confirm that with our model later on. 
 
-```{r, echo=FALSE,message=FALSE, out.width="50%", fig.show='hold', figures-side}
+```{r, echo=FALSE,message=FALSE, out.width="50%", fig.show='hold'}
 # Creating graph to explore possible relationship of Wins and FIP
-tau <- ggplot(Data, aes(x=W, y=TEAMFIP, size=Payroll, color=lgID)) + geom_point() 
+tau <- ggplot(Data, aes(x=EWins, y=TEAMFIP, size=Payroll, color=lgID)) + geom_point() + stat_smooth(method = 'lm')
 tau + 
   labs(
-    title = "2013 MLB Team Wins vs. FIP",
-    x = "Team Wins",
-    y = "Team: Fielding Independent Pitching"
+    title = "2013 MLB Team Expected Wins vs. FIP",
+    x = "Team Expected Wins",
+    y = "Team Fielding Independent Pitching"
   ) + facet_grid() + theme_gray()
 
 # Creating graph to explore possible relationship of Wins and FIP
-nu <- ggplot(Data, aes(x=W, y=TEAMwOBA, size=Payroll, color=lgID)) + geom_point() 
+nu <- ggplot(Data, aes(x=EWins, y=TEAMwOBA, size=Payroll, color=lgID)) + geom_point() + stat_smooth(method = 'lm')
 nu + 
   labs(
-    title = "2013 MLB Team Wins vs. wOBA",
-    x = "Team Wins",
-    y = "Team: Weighted On-Base Average"
+    title = "2013 MLB Team Expected Wins vs. wOBA",
+    x = "Team Expected Wins",
+    y = "Team Weighted On-Base Average"
   ) + facet_grid() + theme_gray()
 ```
 
-Lastly, I wanted to observe if we predicted a means expected win percentage versus their actual wins earned, would we see a highly positive relationship. We can only assume that a team with a lot of wins scored significantly more runs than they gave up, but just to make sure we are correct in this assumption, lets test it. Within our model, we can see that a expected wins by team and actual wins have a highly positive relationship and that the majority of teams that scored more runs than surrendered to the other team, did in fact win games at a higher rate. Now that we understand what kind of varialbles we believe who have some relationship to wins, lets do some regression testing.
+<h4 style="text-align: left;">Assumption #2: No Multicollinearity</h4>
 
-```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="60%"}
-theta <- ggplot(Data, aes(x=W, y=EWins, color=Payroll)) + geom_point() + stat_smooth(method = 'lm')
-theta + scale_color_gradient(low="red", high="green") + 
-  labs(title = "2013 MLB Season Team Wins vs. Expected Wins",
-       x = "Actual Wins by Team",
-       y = "Expected Wins by Team") +
-  guides(fill = guide_legend(title = "Team Payroll")) +
-  theme(plot.title = element_text(hjust = 0.5))
+Note that their is a linear relationship with the exploratory variables and the dependent variable, expected wins, we can test if there is multicollinearity present between the exploratory variables. To begin this, we want to review the summary results running our 'Wins' model listed above. 
+
+```{r echo=FALSE}
+lm(EWins ~ TEAMwOBA + TEAMFIP + Payroll, data=Data) %>%
+  tidy() %>% 
+  kable( caption = "Regession Results",
+         col.names = c("Independent Variables", "Estimate", "Std. Error", "T-Value", "P-Vale"))
 ```
 
+From these regression results we can observe a few things. First, we see that both wOBA and FIP are statistically significant at a 99% confidence interval with Payroll being statistical insignificance. Additionally, we can observe that the exploratory variables explain 58.23 percent of the variation in expected wins. However, we still need to test multicollinearity first! So lets do that and see if we can remove certain variables from our initial model. 
+
+For us to test for multicollinearity, we will us a variance inflation factor (VIF) in order to detect if multicollinearity exists. The value for VIF starts at 1 and has no upper limit. A general rule of thumb for interpreting VIFs is as follows:
+
+* A value of 1 indicates there is no correlation between a given predictor variable and any other predictor variables in the model.
+
+* A value between 1 and 5 indicates moderate correlation between a given predictor variable and other predictor variables in the model, but this is often not severe enough to require attention.
+
+* A value greater than 5 indicates potentially severe correlation between a given predictor variable and other predictor variables in the model. In this case, the coefficient estimates and p-values in the regression output are likely unreliable.
+
+``` {r echo=FALSE, results = "asis"} 
+Wins <- lm(EWins~TEAMwOBA+TEAMFIP+Payroll, data=Data)  
+VIF <- vif(Wins)
+
+barplot(VIF, main = "VIF Values", horiz = TRUE, col = "steelblue",  
+        names.arg=c("TEAMwOBA", "TEAMFIP", "Payroll"), xlim=c(0,6))
+#add vertical line at 5
+abline(v = 1, lwd = 3, lty = 2)
+abline(v = 5, lwd = 3, lty = 2)
+```
+
+After looking observing our graph, we can see that they may be some moderate amount of multicollinearity present within the model. However, it is not severe enough for us to remove or change any of the variables present within the model. We will continue with the next assumption and test if residual values of the exploratory variables have a mean of zero. 
+
+###### Note: Multicollinearity is when exploratory variables (x) are independent and observed with negligible error. Meaning these variables have little to no relationship with each other, giving us the most accurate model and explanation of the dependent variable as possible. 
+
+<h4 style="text-align: left;">Assumption #3: Independence</h4>
+Next we want to test if our explanatory variables are independent. Meaning that the exploratory variables (x) are independent and observed with negligible error of each other. We can test this through a what is called a Durbin-Watson Test. A model with a test static output between 1.21 and 1.65 at a 95 percent confidence interval for a Durbin-Watson test is considered to be statistically significant. Meaning that the residuals of exploratory variables within the model are not correlated. A violation of this assumption would underestimate the standard errors within the model giving a false positive of statistical significance.  
+
+```{r echo=FALSE, results = "asis"}
+durbinWatsonTest(Wins) %>%
+  tidy()%>%
+kable(caption = "Durbin-Watson Residual Autocorrelation Test")
+```
+
+In this test we see that our model fails the Durbin-Watson Test and that there is some kind of serial correlation of the residuals within our explanatory variables. Meaning that there will be over estimated coefficients of our models. After doing a couple of variations of this model, there wasn't a single combination of these variables, other than by themselves, where the Durbin-Watson test passed. Meaning that these variables are indeed correlated to some extent. For exploratory reason, let's continue with our testing. 
+
+<h4 style="text-align: left;">Assumption #4: Homoskedasticity</h4>
+
+The next test we want to cover is testing if our residual errors are constant. This will mean that a model is considered to be homoskedastic. Homoskedasticity is considered to be important because the alternative will increase the coefficient estimates and may provide another false positive. For this test we will utilize a Breusch-Pagan test for our model that we already know to be faulty, but lets explore!
+
+```{r, echo=FALSE,message=FALSE, fig.align='center', out.width="60%"}
+plot(fitted(Wins), resid(Wins), xlab="Fitted Values", ylab="Residuals")
+abline(0,0)
+
+bptest(Wins) %>%
+  tidy()%>%
+kable(caption = "Breusch-Pagan Homoskedasticity Test")
+```
+
+After examining the results, we see that our residuals are not considered to be constant and that heterosKedasticiy exists within the model. Which will cause our model to have overestimates and provide us with variables that appear to be statistically significant but are not in actuality. 
+
+<h4 style="text-align: left;">Assumption #5: Multivariate Normality</h4>
+
+The final assumption that needs to be fulfilled is to determine if each variable has multivariate normality. Which flows a Gaussian normal distribution that shows the major of a 
+data occurs in the middle with two "tails" at the ends. We can achieve this by utilizing a Quantile-Quantile Plot along with an Anderson-Darling Test from the MVN package. This test tries to identify if each individual variable within the model is considered to have normal distribution and if a value is considered to be statistically significant, then they will be considered to not have normality and should be removed from the model. 
+
+```{r, echo=FALSE,message=FALSE,fig.align='center', out.width="80%", fig.show='hold'}
+DataQQ <- lapply(Data, as.numeric)
+DataQQ <- as.data.frame(DataQQ)
+DataQQ <- DataQQ %>%
+  select(EWins, TEAMwOBA, TEAMFIP, Payroll)
+
+MVN <- mvn(DataQQ, mvnTest = "mardia", multivariatePlot = "qq")
+
+kable(MVN$univariateNormality, caption = "Multivariate Normaility Testing")
+```
+
+As we can observe from the table and graph above, the majority of the variables are considered to have a normal distribution. Unlike a team's payroll, that appears not be a good variable to include for our model. For now, we will keep Payroll and see what other tests, if any it fails but will remove it from the final model we create. Now that we have finished all of our assumptions, let see what our final model will look like.  
+
 <h1 style="text-align: left;">Conclusion</h1>
+
+We conclude that our variables of FIP, wOBA, and Payroll are not considered to be variables that can predict a team's expected wins total for a given season. Due to high levels of serial correlation between the explanatory variables and the heteroskedasticity of the residual errors within the model. For future exploration, a user may want to look into utilizing a time-series analysis or bring in more variables to explore the variation present within the model. 
 
 
 <h1 style="text-align: left;">Reference</h1>
@@ -233,4 +325,5 @@ theta + scale_color_gradient(low="red", high="green") +
 - Markdown Guide: `https://www.markdownguide.org/extended-syntax/#definition-lists`
 - Robert Breunig, Bronwyn Garrett-Rumba, Mathieu Jardin, Yvon Rocaboy. (2014) Wage dispersion and team performance: a theoretical model and evidence from baseball. Applied Economics 46:3, pages 271-281. 
 - Sean Lahman Database: `https://www.seanlahman.com/baseball-archive/statistics/`
+- Toward Data Science : `https://towardsdatascience.com/all-the-statistical-tests-you-must-do-for-a-good-linear-regression-6ec1ac15e5d4`
 - Wooldridge, Jeffrey M. Introductory Econometrics: A Modern Approach. Australia: Cengage, 2020. 
