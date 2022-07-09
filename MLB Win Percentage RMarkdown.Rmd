@@ -111,7 +111,7 @@ knitr::include_graphics("Playoffs.png")
 - EWP: Expected Win Percentage
 - EWins: Expected WINS (Forecast)
 
-## Creating Dataframes
+<h1 style="text-align: left;">Creating Data Frames</h1>
 ```{r echo = FALSE, message=FALSE, collapse=TRUE}
 #Loading in the salaries of each team for the 2013 Season
 S <- Lahman::Salaries %>% select(yearID,teamID,lgID,playerID,salary) %>%
@@ -190,7 +190,7 @@ library(knitr)
 kable(DataNeat, caption = 'Summary Statisitics')
 ```
 
-<h1 style="text-align: center;">Testing Assumptions</h1>
+<h1 style="text-align: left;">Testing Assumptions</h1>
                                             Original Proposed Model
                              Expected Wins ~ Team WOBA + Team FIP + Payroll + error
 
