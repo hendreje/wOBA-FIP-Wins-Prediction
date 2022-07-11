@@ -1,2 +1,2 @@
 # wOBA-FIP-Wins-Prediction
-Statistical Analysis of 2013 MLB Season and predicting number of wins a team would have won (R Studio)
+Predicting number of wins a team would have won by utilizing wOBA, FIP, and Payment with R Studio and RMarkdown to provide PDF and HTML document. 
