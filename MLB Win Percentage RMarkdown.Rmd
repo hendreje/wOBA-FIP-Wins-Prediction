@@ -6,8 +6,6 @@ output:
   html_document:
     toc: yes
     number_sections: no
-  word_document:
-    toc: yes
   pdf_document:
     toc: yes
 ---
@@ -37,9 +35,9 @@ knitr::include_graphics("2013_World_Series_logo.png")
 
 <h1 style="text-align: left;">Introduction</h1>
 
-In 2013, MLB baseball saw the Boston Red Sox win their third World Series in 10 seasons over the St. Louis Cardinals with David Ortiz taking home World Series MVP honors. No one was really shocked by these two teams making it to the World Series. They were head and shoulders better than the majority of their respective leagues and truly dominated their way to the World Series. These two teams we great on the field and but had a seemingly significant difference in funding, Boston at 150+ Million and St.Louis at 92 Million. Additionally, they were poth considered to be two of the better teams when it came to pitching and hitting. With future Hall of Fames such as Manny Rameriez, David Ortiz, and Pedro Martinez for Boston to name a few. However, St. Louis had a few names of their own to include Albert Pujlos, Jim Edmonds, and Mark Mulder. It really was no surprise these two made it to the final game of the year. But we are not here to discuss who made it to the World Series, but to discover what 'ingredients' it takes to "March into October". 
+In 2013, MLB baseball saw the Boston Red Sox win their third World Series in 10 seasons over the St. Louis Cardinals with David Ortiz taking home World Series MVP honors. No one was really shocked by these two teams making it to the World Series. They were head and shoulders better than the majority of their respective leagues and truly dominated their way to the World Series. These two teams we great on the field and but had a seemingly significant difference in funding, Boston at 150+ Million and St.Louis at 92 Million. Additionally, they were both considered to be two of the better teams when it came to pitching and hitting. With future Hall of Famers such as Manny Rameriez, David Ortiz, and Pedro Martinez for Boston, to name a few. However, St. Louis had a few names of their own to include Albert Pujlos, Jim Edmonds, and Mark Mulder. But we are not here to discuss who made it to the World Series, but to discover what 'ingredients' it takes to "March into October". 
 
-The premise of this analysis is to understand if we can predict the number of wins a team recorded based on a teams runs scored, runs allowed, payroll, weighted on-base-average (wOBA), and fielding independent pitching (FIP). In theory, payroll enables teams to purchase the best players and the best players should be able to score the most runs while giving up the fewest. Those expected win totals will give us an understanding of the teams that should have made the playoffs in 2013. This would be based on the number of runs they scored versus the number of runs given up. Additionally, we look to observe if advanced metrics such as wOBA and FIP can explain any of the variation we observe with a team's win total in 2013. 
+The premise of this analysis is to understand if we can predict the number of expected wins a team recorded based on a teams runs scored, runs allowed, payroll, weighted on-base-average (wOBA), and fielding independent pitching (FIP). In theory, payroll enables teams to purchase the best players and the best players should be able to score the most runs while giving up the fewest. Those expected win totals will give us an understanding of the teams that should have made the playoffs in 2013. This would be based on the number of runs they scored versus the number of runs given up. Additionally, we look to observe if advanced metrics such as wOBA and FIP can explain any of the variation we observe with a team's win total in 2013. 
 
 ```{r, echo=FALSE, out.width="75%", fig.align='center'}
 knitr::include_graphics("Playoffs.png")
@@ -110,6 +108,7 @@ knitr::include_graphics("Playoffs.png")
 - RA: Number of Runs scored AGAINST a team in a season
 - EWP: Expected Win Percentage
 - EWins: Expected WINS (Forecast)
+- AWP: Actual Win Percents
 
 <h1 style="text-align: left;">Creating Data Frames</h1>
 ```{r echo = FALSE, message=FALSE, collapse=TRUE}
@@ -165,7 +164,7 @@ df2 <- df2 %>% select(teamID,lgID,Payroll,W,L,R,RA,TEAMwOBA,TEAMFIP)
 # Creating Predictive Model of teams that did make the playoffs verses those who are
 #predicted to make the playoffs
 Data <- df2%>%
-  mutate(EWP = ((R/RA)^1.6)/((R/RA)^1.6+1), EWins = EWP*162, AWP = W/162, WinPctDiff = AWP-EWP)
+  mutate(EWP = ((R/RA)^1.6)/((R/RA)^1.6+1), EWins = round(EWP*162), AWP = W/162, WinPctDiff = AWP-EWP)
 
 DataNeat <- Data
 
@@ -174,10 +173,15 @@ DataNeat$Payroll <- currency(DataNeat$Payroll, digits = 0L)
 DataNeat$TEAMwOBA <- percent(DataNeat$TEAMwOBA, digits = 2L)
 
 DataNeat$EWP <- percent(DataNeat$EWP, digits = 2L)
+
+DataNeat$AWP <- percent(DataNeat$AWP, digits = 2L)
+
+DataNeat$WinPctDiff <- percent(DataNeat$WinPctDiff, digits = 2L)
 ```
 
 <h4 style="text-align: left;">Sean Lahman's Major League Baseball Statistic Descriptions</h4>
-Lahman's "Salaries" data frame highlights and summarizes the payroll of each team in 2013 and the players which team paid and how much they were paid for that season. For this analysis, we were not interested in individual pay, only the sum of what each team spent in 2013. Therefore, we will remove players names, IDs, and individual salaries from the table. 
+
+Lahman's "Salaries" data frame highlights and summarizes the payroll of each team in 2013 along with the individual amount players made in 2013. For this analysis, we were not interested in individual pay, only the sum of what each team spent in 2013. Therefore, we will remove players names, IDs, and individual salaries from the table. 
 
 Lahman's "Teams" data frame highlights and summaries each team's wins, losses, runs scored, runs allowed, and playoff win statistics. These columns will be used to help us predict future win totals and see if our model is statistically significant and accurate at predicting playoff teams. 
 
@@ -203,7 +207,7 @@ kable(DataNeat, caption = 'Summary Statisitics')
                         
 <h4 style="text-align: left;">Assumption #1: Liner Relationship</h4>
 
-Now that we have gathered all of our data and made the proper modifications, lets dive into some analysis and confirm the five assumptions of multivariate regression. First, we will start with confirming that there exists a linear relationship between each of the independent variables and the dependent variable. We can confirm this by plotting each of three scenarios. From the graphs below, it appears that there is a some what linear relationship between each of the exploratory variables and Wins. We can move onto the next assumption.  
+Now that we have gathered all of our data and made the proper modifications, lets dive into some analysis and confirm the five assumptions of multivariate regression. First, we will start with confirming that there exists a linear relationship between each of the independent variables and the dependent variable. We can confirm this by plotting each of three scenarios. From the graphs below, it appears that there is a some what linear relationship between each of the exploratory variables and expected wins. We can move onto the next assumption.  
 
 ```{r, echo=FALSE, message=FALSE, out.width="60%", fig.show='hold', fig.align='center'}
 alpha <- ggplot(Data, aes(x=EWins, y=Payroll, color=lgID)) + geom_point() + stat_smooth(method = 'lm')
@@ -267,7 +271,7 @@ abline(v = 1, lwd = 3, lty = 2)
 abline(v = 5, lwd = 3, lty = 2)
 ```
 
-After looking observing our graph, we can see that they may be some moderate amount of multicollinearity present within the model. However, it is not severe enough for us to remove or change any of the variables present within the model. We will continue with the next assumption and test if residual values of the exploratory variables have a mean of zero. 
+After looking observing our graph, we can see that there is minimal amounts of multicollinearity present within the model. However, it is not severe enough for us to remove or change any of the variables present within the model. We will continue with the next assumption and test if residual values of the exploratory variables have a mean of zero. 
 
 ###### Note: Multicollinearity is when exploratory variables (x) are independent and observed with negligible error. Meaning these variables have little to no relationship with each other, giving us the most accurate model and explanation of the dependent variable as possible. 
 
@@ -295,7 +299,7 @@ bptest(Wins) %>%
 kable(caption = "Breusch-Pagan Homoskedasticity Test")
 ```
 
-After examining the results, we see that our residuals are not considered to be constant and that heterosKedasticiy exists within the model. Which will cause our model to have overestimates and provide us with variables that appear to be statistically significant but are not in actuality. 
+After examining the results, we see that our residuals are not considered to be constant and that heteroskedasticiy exists within the model. Which will cause our model to have overestimates and provide us with variables that appear to be statistically significant but are not in actuality. 
 
 <h4 style="text-align: left;">Assumption #5: Multivariate Normality</h4>
 
@@ -313,7 +317,7 @@ MVN <- mvn(DataQQ, mvnTest = "mardia", multivariatePlot = "qq")
 kable(MVN$univariateNormality, caption = "Multivariate Normaility Testing")
 ```
 
-As we can observe from the table and graph above, the majority of the variables are considered to have a normal distribution. Unlike a team's payroll, that appears not be a good variable to include for our model. For now, we will keep Payroll and see what other tests, if any it fails but will remove it from the final model we create. Now that we have finished all of our assumptions, let see what our final model will look like.  
+As we can observe from the table and graph above, the majority of the variables are considered to have a normal distribution. Unlike a team's payroll, that appears not be a good variable to include for our model. For now, we will keep Payroll and see what other tests, if any it fails but will remove it from the final model we create. Now that we have finished all of our assumptions, let's wrap up our analysis and review how our model did.  
 
 <h1 style="text-align: left;">Conclusion</h1>
 
